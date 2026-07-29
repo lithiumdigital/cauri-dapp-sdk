@@ -1,0 +1,53 @@
+{
+    "name": "@lithiumdigital/cauri-dapp-sdk",
+    "version": "0.1.0",
+    "type": "module",
+    "description": "Cauri Wallet dApp SDK — ProviderAdapter for the PartyLayer generic bridge (Canton Network wallet-discovery standard).",
+    "license": "UNLICENSED",
+    "private": true,
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs",
+            "default": "./dist/index.js"
+        }
+    },
+    "scripts": {
+        "build": "tsdown --onSuccess \"tsc\"",
+        "dev": "tsdown --watch --onSuccess \"tsc\"",
+        "clean": "tsc -b --clean; rm -rf dist",
+        "test": "vitest run --passWithNoTests",
+        "test:coverage": "vitest run --coverage --passWithNoTests",
+        "typecheck": "tsc --noEmit"
+    },
+    "dependencies": {
+        "@canton-network/core-splice-provider": "^1.8.0",
+        "@canton-network/core-types": "^1.8.0",
+        "@canton-network/core-wallet-dapp-rpc-client": "^1.8.0",
+        "@canton-network/core-wallet-discovery": "^1.8.0"
+    },
+    "devDependencies": {
+        "@vitest/coverage-v8": "^4.1.10",
+        "tsdown": "^0.22.9",
+        "typescript": "^5.9.3",
+        "vitest": "^4.1.10"
+    },
+    "files": [
+        "dist/**"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/lithiumdigital/cauri-dapp-sdk.git"
+    },
+    "homepage": "https://github.com/lithiumdigital/cauri-dapp-sdk#readme",
+    "bugs": {
+        "url": "https://github.com/lithiumdigital/cauri-dapp-sdk/issues"
+    }
+}
