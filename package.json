@@ -3,8 +3,9 @@
     "version": "0.1.0",
     "type": "module",
     "description": "Cauri Wallet dApp SDK — ProviderAdapter for the PartyLayer generic bridge (Canton Network wallet-discovery standard).",
-    "license": "UNLICENSED",
+    "license": "Apache-2.0",
     "private": true,
+    "sideEffects": false,
     "main": "./dist/index.cjs",
     "module": "./dist/index.js",
     "types": "./dist/index.d.ts",
@@ -24,13 +25,17 @@
         "test:coverage": "vitest run --coverage --passWithNoTests",
         "typecheck": "tsc --noEmit"
     },
-    "dependencies": {
-        "@canton-network/core-splice-provider": "^1.8.0",
-        "@canton-network/core-types": "^1.8.0",
-        "@canton-network/core-wallet-dapp-rpc-client": "^1.8.0",
-        "@canton-network/core-wallet-discovery": "^1.8.0"
+    "peerDependencies": {
+        "@canton-network/core-splice-provider": "^1.7.0",
+        "@canton-network/core-types": "^1.7.0",
+        "@canton-network/core-wallet-dapp-rpc-client": "^1.7.0",
+        "@canton-network/core-wallet-discovery": "^1.7.0"
     },
     "devDependencies": {
+        "@canton-network/core-splice-provider": "^1.7.0",
+        "@canton-network/core-types": "^1.7.0",
+        "@canton-network/core-wallet-dapp-rpc-client": "^1.7.0",
+        "@canton-network/core-wallet-discovery": "^1.7.0",
         "@vitest/coverage-v8": "^4.1.10",
         "tsdown": "^0.22.9",
         "typescript": "^5.9.3",

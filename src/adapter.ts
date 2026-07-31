@@ -5,13 +5,17 @@ import type {
     WalletInfo,
 } from '@canton-network/core-wallet-discovery'
 import { CauriProvider } from './provider'
+import { clearSession, loadSession } from './storage'
 import type { CauriAdapterConfig } from './types'
 
-const CAURI_ICON_URL = 'https://cauri.cc/icon.svg'
+const CAURI_ICON_URL =
+    'https://raw.githubusercontent.com/lithiumdigital/cauri-dapp-sdk/main/assets/cauri.svg'
 
 export function createCauriAdapter(
     config: CauriAdapterConfig,
 ): ProviderAdapter {
+    let current: CauriProvider | null = null
+
     return {
         providerId: 'cauri',
         name: 'Cauri',
@@ -25,7 +29,6 @@ export function createCauriAdapter(
                 type: 'remote',
                 icon: CAURI_ICON_URL,
                 url: config.walletUiBase,
-                // One popup per approval request — see docs/DECISIONS.md.
                 reuseGlobalWalletPopup: false,
             }
         },
@@ -35,18 +38,38 @@ export function createCauriAdapter(
         },
 
         provider(): Provider<DappRpcTypes> {
-            return new CauriProvider(config)
+            if (!current) current = new CauriProvider(config)
+            return current
         },
 
         teardown(): void {
-            // TODO: close any open popup window opened by provider().
+            if (current) {
+                current.closeAllPopups()
+                current = null
+            }
         },
 
         async restore(): Promise<Provider<DappRpcTypes> | null> {
-            // TODO: read cauriSessionId + cauriSessionToken from storage,
-            // call isConnected against apiBase, return a CauriProvider or null.
-            // Must be gesture-free (no popup).
-            return null
+            const persisted = loadSession()
+            if (!persisted) return null
+
+            const provider = new CauriProvider(config, {
+                sessionId: persisted.sessionId,
+                sessionToken: persisted.sessionToken,
+            })
+
+            try {
+                const status = await provider.request({ method: 'isConnected' })
+                if (!status.isConnected) {
+                    clearSession()
+                    return null
+                }
+                current = provider
+                return provider
+            } catch {
+                clearSession()
+                return null
+            }
         },
     }
 }
