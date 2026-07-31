@@ -37,6 +37,7 @@
         "@canton-network/core-wallet-dapp-rpc-client": "^1.7.0",
         "@canton-network/core-wallet-discovery": "^1.7.0",
         "@vitest/coverage-v8": "^4.1.10",
+        "jsdom": "^29.1.1",
         "tsdown": "^0.22.9",
         "typescript": "^5.9.3",
         "vitest": "^4.1.10"
