@@ -1,16 +1,6 @@
 import type { ProviderAdapter } from '@canton-network/core-wallet-discovery'
 import { createCauriAdapter } from './adapter'
 
-/**
- * Explicit mapping from the wallet UI origin (the value published in the
- * PartyLayer registry's `networkHosts`) to the corresponding dApp API
- * origin. Hostnames rather than URLs so a stray trailing slash or scheme
- * mismatch doesn't miss the lookup.
- *
- * Kept explicit rather than derived (e.g. by prepending "api.") because
- * mainnet is served from the apex domain (cauri.cc) while its API lives
- * at api.mainnet.cauri.cc — a naive transform breaks that case.
- */
 const API_BASE_BY_WALLET_HOST: Record<string, string> = {
     'cauri.cc': 'https://api.mainnet.cauri.cc',
     'devnet.cauri.cc': 'https://api.devnet.cauri.cc',
@@ -28,14 +18,9 @@ function resolveApiBase(walletUiBase: string): string {
 }
 
 /**
- * OfficialAdapterFactory for the PartyLayer generic bridge. The bridge
- * resolves `adapter.networkHosts[activeNetwork]` from the registry entry
- * and calls `create(host)` synchronously on the popup-safe gesture path.
- * `create` returns a fresh ProviderAdapter bound to the resolved host.
- *
- * For local dev or bespoke deployments where the URLs don't match the
- * hosted-Cauri convention, use `createCauriAdapter({apiBase, walletUiBase})`
- * directly and pass it via `additionalAdapters` instead.
+ * OfficialAdapterFactory for the PartyLayer generic bridge. For local
+ * dev or hosts not in the mapping table, use `createCauriAdapter`
+ * directly with an explicit `{apiBase, walletUiBase}`.
  */
 export const cauriAdapterFactory = {
     providerId: 'cauri' as const,

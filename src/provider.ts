@@ -25,7 +25,6 @@ import {
 import { clearSession, saveSession } from './storage'
 import type { CauriAdapterConfig } from './types'
 
-// postMessage envelopes exchanged with the Cauri wallet approval popup.
 const MSG_CONNECT_SUCCESS = 'SPLICE_WALLET_IDP_AUTH_SUCCESS'
 const MSG_CONNECT_REJECTED = 'SPLICE_WALLET_IDP_AUTH_REJECTED'
 const MSG_TX_APPROVED = 'SPLICE_WALLET_TX_APPROVED'
@@ -69,7 +68,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
         return Boolean(this.sessionToken)
     }
 
-    /** Close any popups this provider still owns. Called by adapter.teardown(). */
+    /** Close any popups this provider still owns. */
     closeAllPopups(): void {
         for (const p of this.activePopups) {
             try {
@@ -123,8 +122,6 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
     }
 
     private async doConnect(): Promise<ConnectResult> {
-        // Open the popup synchronously in the user-gesture call stack;
-        // browsers demote a later window.open to a background tab.
         const popup = openPlaceholderPopup('cauriConnect')
         if (!popup) throw new Error('Popup blocked. Allow popups for this site and try again.')
         this.activePopups.add(popup)

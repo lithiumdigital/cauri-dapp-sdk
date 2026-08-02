@@ -108,7 +108,6 @@ export function waitForOpenerMessage<T>(
             abortSignal?.removeEventListener('abort', onAbort)
         }
         const onMsg = (ev: MessageEvent) => {
-            // Origin + source check — reject forged approvals from unrelated frames.
             if (ev.origin !== walletOrigin) return
             if (ev.source !== popup) return
             const m = ev.data as { type?: string }
@@ -130,8 +129,6 @@ export function waitForOpenerMessage<T>(
             cleanup()
             resolve(undefined)
         }, timeoutMs)
-        // If the user closes the popup manually, resolve as a rejection
-        // instead of hanging until timeoutMs.
         const closedPoll = setInterval(() => {
             if (popup.closed) {
                 cleanup()

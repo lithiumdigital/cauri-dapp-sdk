@@ -9,11 +9,31 @@ interface JsonRpcRequest {
     params?: Record<string, unknown>
 }
 
+interface JsonRpcErrorObject {
+    code: number
+    message: string
+    data?: unknown
+}
+
 interface JsonRpcResponse<T> {
     jsonrpc: '2.0'
     id: string
     result?: T
-    error?: { code: number; message: string; data?: unknown }
+    error?: JsonRpcErrorObject
+}
+
+/**
+ * Thrown when the gateway returns a JSON-RPC error. Exposes `.error`
+ * ({code, message, data}) for callers that render by error code while
+ * remaining `instanceof Error` for generic catch blocks.
+ */
+export class CauriRpcError extends Error {
+    readonly error: JsonRpcErrorObject
+    constructor(rpcError: JsonRpcErrorObject) {
+        super(rpcError.message)
+        this.name = 'CauriRpcError'
+        this.error = rpcError
+    }
 }
 
 export interface CauriConnectResult {
@@ -77,9 +97,7 @@ export class CauriRpcClient {
             )
         }
         if (parsed.error) {
-            throw new Error(
-                `Cauri gateway ${method} failed: ${parsed.error.code} ${parsed.error.message}`,
-            )
+            throw new CauriRpcError(parsed.error)
         }
         if (!res.ok) {
             throw new Error(

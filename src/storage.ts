@@ -33,7 +33,6 @@ export function saveSession(record: CauriSessionRecord): void {
         if (typeof localStorage === 'undefined') return
         localStorage.setItem(STORAGE_KEY, JSON.stringify(record))
     } catch {
-        // no-op: persistence is best-effort
     }
 }
 
@@ -42,6 +41,5 @@ export function clearSession(): void {
         if (typeof localStorage === 'undefined') return
         localStorage.removeItem(STORAGE_KEY)
     } catch {
-        // no-op
     }
 }
