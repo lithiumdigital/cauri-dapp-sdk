@@ -45,6 +45,7 @@ export function createCauriAdapter(
         teardown(): void {
             if (current) {
                 current.closeAllPopups()
+                current.closeEventStream()
                 current = null
             }
         },

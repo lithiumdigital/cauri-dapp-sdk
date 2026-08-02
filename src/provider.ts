@@ -22,6 +22,7 @@ import {
     type CauriSignMessageResult,
     type CauriPrepareExecuteResult,
 } from './rpc'
+import { openEventStream, type StreamHandle } from './stream'
 import { clearSession, saveSession } from './storage'
 import type { CauriAdapterConfig } from './types'
 
@@ -50,6 +51,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
     private sessionToken: string | undefined
     private sessionId: string | undefined
     private readonly activePopups = new Set<Window>()
+    private eventStream: StreamHandle | undefined
 
     constructor(
         config: CauriAdapterConfig,
@@ -61,6 +63,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
         this.walletOrigin = normalizeOrigin(config.walletUiBase)
         this.sessionToken = state.sessionToken
         this.sessionId = state.sessionId
+        if (this.sessionToken) this.openStream(this.sessionToken)
     }
 
     /** True once connect() has resolved (or a session was restored). */
@@ -78,6 +81,19 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
             }
         }
         this.activePopups.clear()
+    }
+
+    /** Close the SSE event stream, if open. */
+    closeEventStream(): void {
+        this.eventStream?.close()
+        this.eventStream = undefined
+    }
+
+    private openStream(token: string): void {
+        this.closeEventStream()
+        this.eventStream = openEventStream(this.rpc.apiBase, token, (name, data) => {
+            this.emit(name, data)
+        })
     }
 
     async request<M extends keyof DappRpcTypes>(
@@ -153,6 +169,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
             this.sessionId = sessionId
             this.sessionToken = result.sessionToken
             saveSession({ sessionId, sessionToken: result.sessionToken })
+            this.openStream(result.sessionToken)
             return {
                 isConnected: result.isConnected,
                 isNetworkConnected: result.isNetworkConnected,
@@ -171,6 +188,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
             this.sessionToken = undefined
             this.sessionId = undefined
             clearSession()
+            this.closeEventStream()
             this.closeAllPopups()
         }
         return null
@@ -189,6 +207,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
             this.sessionToken = undefined
             this.sessionId = undefined
             clearSession()
+            this.closeEventStream()
         }
         return {
             isConnected: status.isConnected,
