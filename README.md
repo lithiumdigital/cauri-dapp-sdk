@@ -86,6 +86,23 @@ npm test
 npm run typecheck
 ```
 
+## Versioning
+
+Semantic versioning. The **public API** is everything exported from
+`src/index.ts` (`createCauriAdapter`, `cauriAdapterFactory`,
+`CauriRpcError`, `CauriAdapterConfig`, `CauriSessionRecord`) and the
+runtime behaviour of those exports (RPC method surface, event names,
+storage key). Anything else is internal and may change in any release.
+
+- **Major** — breaking change to any of the above (renamed export,
+  removed method, changed event name, changed storage key/shape).
+- **Minor** — additive change (new export, new supported method,
+  additional optional config).
+- **Patch** — bug fix or internal change with no consumer-visible
+  behaviour change.
+
+See [CHANGELOG.md](./CHANGELOG.md) for what shipped in each version.
+
 ## References
 
 - Standard: `@canton-network/core-wallet-discovery` (v1.8.0)
