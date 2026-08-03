@@ -13,7 +13,7 @@ _No changes yet._
 Initial release.
 
 - `createCauriAdapter({apiBase, walletUiBase})` for explicit-URL wiring
-- `cauriAdapterFactory` for the PartyLayer generic bridge
+- `cauriAdapterFactory` for wallet-discovery frameworks
 - CIP-103 method dispatch: `connect`, `disconnect`, `isConnected`,
   `status`, `getActiveNetwork`, `listAccounts`, `getPrimaryAccount`,
   `signMessage`, `prepareExecute`, `ledgerApi`

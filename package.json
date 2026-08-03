@@ -2,7 +2,7 @@
     "name": "@lithiumdigital/cauri-dapp-sdk",
     "version": "0.1.0",
     "type": "module",
-    "description": "Cauri Wallet dApp SDK — ProviderAdapter for the PartyLayer generic bridge (Canton Network wallet-discovery standard).",
+    "description": "Cauri Wallet dApp SDK — CIP-103 ProviderAdapter for the Canton Network wallet-discovery standard.",
     "license": "Apache-2.0",
     "sideEffects": false,
     "main": "./dist/index.cjs",

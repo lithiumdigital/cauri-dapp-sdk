@@ -1,8 +1,10 @@
 # @lithiumdigital/cauri-dapp-sdk
 
-Cauri Wallet dApp SDK. Ships a `ProviderAdapter` conforming to the Canton
-Network wallet-discovery standard, for use with the PartyLayer generic
-bridge (Path B — Discovery Adapter).
+dApp SDK for [Cauri Wallet](https://cauri.cc) on the Canton Network.
+Ships a CIP-103 compliant `ProviderAdapter` that a dApp can drop into
+its wallet-selection UI to prompt users for connection, message
+signing, and prepared-transaction execution against a live Cauri
+wallet session.
 
 ## Installation
 
@@ -10,7 +12,8 @@ bridge (Path B — Discovery Adapter).
 npm install @lithiumdigital/cauri-dapp-sdk
 ```
 
-You also need the Canton Network core packages (peer dependencies):
+Peer dependencies (Canton Network core packages, installed once per
+dApp):
 
 ```
 npm install \
@@ -22,34 +25,13 @@ npm install \
 
 ## Usage
 
-The package exports two entry points; use the one that matches how your
-dApp discovers wallets.
-
-### `cauriAdapterFactory` — PartyLayer generic bridge
-
-For dApps that let PartyLayer resolve the wallet host from its registry
-entry (`networkHosts[activeNetwork]`). The factory maps the resolved
-host to the corresponding dApp API endpoint internally.
-
-```ts
-import { createPartyLayer } from '@partylayer/sdk'
-import { cauriAdapterFactory } from '@lithiumdigital/cauri-dapp-sdk'
-
-const pl = createPartyLayer({
-    network: 'devnet',
-    app: { name: 'My dApp' },
-    adapters: [cauriAdapterFactory],
-})
-```
-
 ### `createCauriAdapter` — explicit URLs
 
-For dApps that supply both URLs directly. Use this for local
-development, staging deployments, or any environment not covered by
-the built-in host mapping.
+Construct an adapter against the Cauri wallet host of your choice.
+Use this for local development, staging deployments, or any custom
+wiring where you supply the URLs directly.
 
 ```ts
-import { createPartyLayer } from '@partylayer/sdk'
 import { createCauriAdapter } from '@lithiumdigital/cauri-dapp-sdk'
 
 const cauri = createCauriAdapter({
@@ -57,18 +39,47 @@ const cauri = createCauriAdapter({
     walletUiBase: 'https://devnet.cauri.cc',
 })
 
-const pl = createPartyLayer({
-    network: 'devnet',
-    app: { name: 'My dApp' },
-    adapters: [cauri],
-})
+const provider = cauri.provider()
+await provider.request({ method: 'connect', params: { ... } })
 ```
+
+The returned adapter conforms to the
+[`ProviderAdapter`](https://www.npmjs.com/package/@canton-network/core-wallet-discovery)
+interface and can be handed to any wallet-discovery consumer that
+expects that shape.
+
+### `cauriAdapterFactory` — discovery-adapter factory
+
+For discovery frameworks that resolve the wallet host from a registry
+entry and pass it into a factory (rather than the dApp author
+constructing the adapter directly). The factory maps the resolved
+production host (`cauri.cc`, `devnet.cauri.cc`) to the corresponding
+Cauri dApp API endpoint internally.
+
+```ts
+import { cauriAdapterFactory } from '@lithiumdigital/cauri-dapp-sdk'
+
+// Passed to a wallet-discovery framework alongside other factories.
+const factories = [cauriAdapterFactory, /* ... */]
+```
+
+## Supported CIP-103 methods
+
+`connect`, `disconnect`, `isConnected`, `status`, `getActiveNetwork`,
+`listAccounts`, `getPrimaryAccount`, `signMessage`, `prepareExecute`,
+`ledgerApi`.
+
+## SSE events
+
+The adapter forwards Cauri wallet events over the standard
+`ProviderAdapter` `on()` surface: `txChanged`, `statusChanged`,
+`accountsChanged`, `messageSignature`.
 
 ## Security
 
 - The adapter persists a Cauri session id and session token in
-  `localStorage` so that a page reload can restore the connection. XSS
-  on the dApp origin can therefore exfiltrate the session token; treat
+  `localStorage` so a page reload can restore the connection. XSS on
+  the dApp origin can therefore exfiltrate the session token; treat
   the token as sensitive as any bearer credential on your origin.
 - Popup replies are only accepted when the message origin matches the
   configured `walletUiBase` and the message source is the popup this
@@ -105,5 +116,6 @@ See [CHANGELOG.md](./CHANGELOG.md) for what shipped in each version.
 
 ## References
 
-- Standard: `@canton-network/core-wallet-discovery` (v1.8.0)
-- Generic bridge docs: https://partylayer.xyz/docs/generic-bridge
+- CIP-103 (Canton Network wallet-discovery standard):
+  `@canton-network/core-wallet-discovery`
+- Cauri Wallet: https://cauri.cc

@@ -10,8 +10,8 @@ permissions:
   id-token: write
 
 jobs:
-  publish:
-    name: build / test / npm publish
+  verify:
+    name: verify (typecheck / test / build)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,10 +44,38 @@ jobs:
             exit 1
           fi
 
-      - name: Publish to npm
+  publish:
+    name: publish (approval-gated)
+    needs: verify
+    runs-on: ubuntu-latest
+    # The `release` environment pauses this job until a required
+    # reviewer approves the run in the GitHub Actions UI. Configure it
+    # at: Settings → Environments → release → Required reviewers.
+    environment: release
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.18.0'
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
+      # npm Trusted Publishing needs npm >= 11.5.1. Node 22 ships with
+      # npm 10.x, so upgrade before publish.
+      - name: Upgrade npm for Trusted Publishing
+        run: npm install -g npm@latest
+
+      - name: Publish to npm (Trusted Publishing)
         run: npm publish --access public --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
