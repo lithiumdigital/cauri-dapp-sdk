@@ -4,7 +4,6 @@
     "type": "module",
     "description": "Cauri Wallet dApp SDK — ProviderAdapter for the PartyLayer generic bridge (Canton Network wallet-discovery standard).",
     "license": "Apache-2.0",
-    "private": true,
     "sideEffects": false,
     "main": "./dist/index.cjs",
     "module": "./dist/index.js",
