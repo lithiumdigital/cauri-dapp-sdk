@@ -22,6 +22,32 @@ npm install \
 
 ## Usage
 
+The package exports two entry points; use the one that matches how your
+dApp discovers wallets.
+
+### `cauriAdapterFactory` — PartyLayer generic bridge
+
+For dApps that let PartyLayer resolve the wallet host from its registry
+entry (`networkHosts[activeNetwork]`). The factory maps the resolved
+host to the corresponding dApp API endpoint internally.
+
+```ts
+import { createPartyLayer } from '@partylayer/sdk'
+import { cauriAdapterFactory } from '@lithiumdigital/cauri-dapp-sdk'
+
+const pl = createPartyLayer({
+    network: 'devnet',
+    app: { name: 'My dApp' },
+    adapters: [cauriAdapterFactory],
+})
+```
+
+### `createCauriAdapter` — explicit URLs
+
+For dApps that supply both URLs directly. Use this for local
+development, staging deployments, or any environment not covered by
+the built-in host mapping.
+
 ```ts
 import { createPartyLayer } from '@partylayer/sdk'
 import { createCauriAdapter } from '@lithiumdigital/cauri-dapp-sdk'

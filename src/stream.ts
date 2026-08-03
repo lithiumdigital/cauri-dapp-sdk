@@ -22,6 +22,7 @@ export function openEventStream(
     apiBase: string,
     sessionToken: string,
     onEvent: (name: StreamEventName, data: unknown) => void,
+    onError?: () => void,
 ): StreamHandle {
     if (typeof EventSource === 'undefined') {
         return { close: () => {} }
@@ -34,9 +35,13 @@ export function openEventStream(
             try {
                 onEvent(name, JSON.parse(ev.data))
             } catch {
-                /* ignore malformed payload */
+                /* intentionally ignored — malformed payload */
             }
         })
+    }
+
+    if (onError) {
+        source.addEventListener('error', () => onError())
     }
 
     return {

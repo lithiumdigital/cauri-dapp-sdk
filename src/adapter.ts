@@ -38,7 +38,15 @@ export function createCauriAdapter(
         },
 
         provider(): Provider<DappRpcTypes> {
-            if (!current) current = new CauriProvider(config)
+            if (!current) {
+                const persisted = loadSession()
+                current = persisted
+                    ? new CauriProvider(config, {
+                          sessionId: persisted.sessionId,
+                          sessionToken: persisted.sessionToken,
+                      })
+                    : new CauriProvider(config)
+            }
             return current
         },
 
@@ -54,6 +62,29 @@ export function createCauriAdapter(
             const persisted = loadSession()
             if (!persisted) return null
 
+            // Reuse the provider() instance if it already holds the same session;
+            // constructing a second one opens a second EventSource and orphans the first.
+            if (current?.hasSession()) {
+                const existing = current
+                try {
+                    const status = await existing.request({ method: 'isConnected' })
+                    if (!status.isConnected) {
+                        clearSession()
+                        existing.closeAllPopups()
+                        existing.closeEventStream()
+                        current = null
+                        return null
+                    }
+                    return existing
+                } catch {
+                    clearSession()
+                    existing.closeAllPopups()
+                    existing.closeEventStream()
+                    current = null
+                    return null
+                }
+            }
+
             const provider = new CauriProvider(config, {
                 sessionId: persisted.sessionId,
                 sessionToken: persisted.sessionToken,
@@ -63,12 +94,14 @@ export function createCauriAdapter(
                 const status = await provider.request({ method: 'isConnected' })
                 if (!status.isConnected) {
                     clearSession()
+                    provider.closeEventStream()
                     return null
                 }
                 current = provider
                 return provider
             } catch {
                 clearSession()
+                provider.closeEventStream()
                 return null
             }
         },

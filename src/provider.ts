@@ -33,9 +33,7 @@ const MSG_TX_REJECTED = 'SPLICE_WALLET_TX_REJECTED'
 const MSG_SIGN_MESSAGE_APPROVED = 'SPLICE_WALLET_MSG_SIGN_APPROVED'
 const MSG_SIGN_MESSAGE_REJECTED = 'SPLICE_WALLET_MSG_SIGN_REJECTED'
 
-const CONNECT_TIMEOUT_MS = 5 * 60 * 1000
-const TX_TIMEOUT_MS = 5 * 60 * 1000
-const SIGN_MESSAGE_TIMEOUT_MS = 5 * 60 * 1000
+const APPROVAL_TIMEOUT_MS = 5 * 60 * 1000
 
 export interface CauriProviderInternalState {
     /** Pre-seeded session token — used by restore() so the returned provider is authed on construction. */
@@ -91,9 +89,12 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
 
     private openStream(token: string): void {
         this.closeEventStream()
-        this.eventStream = openEventStream(this.rpc.apiBase, token, (name, data) => {
-            this.emit(name, data)
-        })
+        this.eventStream = openEventStream(
+            this.rpc.apiBase,
+            token,
+            (name, data) => this.emit(name, data),
+            () => this.emit('statusChanged', { isConnected: false, reason: 'stream_error' }),
+        )
     }
 
     async request<M extends keyof DappRpcTypes>(
@@ -162,7 +163,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
                 matchReject: (m) =>
                     m.type === MSG_CONNECT_REJECTED &&
                     (m as { sessionId?: string }).sessionId === sessionId,
-                timeoutMs: CONNECT_TIMEOUT_MS,
+                timeoutMs: APPROVAL_TIMEOUT_MS,
             })
             if (!approval) throw new Error('User rejected connect')
 
@@ -184,6 +185,8 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
             if (this.sessionToken) {
                 await this.rpc.call('disconnect', undefined, this.sessionToken)
             }
+        } catch (err) {
+            console.warn('[cauri-dapp-sdk] disconnect RPC failed; clearing local state anyway', err)
         } finally {
             this.sessionToken = undefined
             this.sessionId = undefined
@@ -249,7 +252,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
                 matchReject: (m) =>
                     m.type === MSG_SIGN_MESSAGE_REJECTED &&
                     (m as { commandId?: string }).commandId === messageId,
-                timeoutMs: SIGN_MESSAGE_TIMEOUT_MS,
+                timeoutMs: APPROVAL_TIMEOUT_MS,
             })
             if (!approval) throw new Error('User rejected signMessage')
             return { signature: approval.signature }
@@ -286,7 +289,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
                 matchReject: (m) =>
                     m.type === MSG_TX_REJECTED &&
                     (m as { commandId?: string }).commandId === commandId,
-                timeoutMs: TX_TIMEOUT_MS,
+                timeoutMs: APPROVAL_TIMEOUT_MS,
             })
             if (!approval) throw new Error('User rejected transaction')
             return null

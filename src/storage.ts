@@ -33,6 +33,7 @@ export function saveSession(record: CauriSessionRecord): void {
         if (typeof localStorage === 'undefined') return
         localStorage.setItem(STORAGE_KEY, JSON.stringify(record))
     } catch {
+        // intentionally ignored — storage unavailable (SSR / private mode / sandbox)
     }
 }
 
@@ -41,5 +42,6 @@ export function clearSession(): void {
         if (typeof localStorage === 'undefined') return
         localStorage.removeItem(STORAGE_KEY)
     } catch {
+        // intentionally ignored — storage unavailable (SSR / private mode / sandbox)
     }
 }
