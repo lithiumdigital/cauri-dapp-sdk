@@ -1,5 +1,6 @@
 /** Wallet-pushed events forwarded from the Cauri gateway's SSE stream. */
 export const STREAM_EVENTS = [
+    'connected',
     'txChanged',
     'statusChanged',
     'accountsChanged',

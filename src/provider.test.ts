@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CauriProvider } from './provider'
-import { CauriRpcError } from './rpc'
+import { CauriRpcError, CauriUserRejectedError } from './rpc'
 
 const CONFIG = {
     apiBase: 'https://api.example',
@@ -57,7 +57,7 @@ describe('CauriProvider — dispatch', () => {
     it('unknown method throws a clear error', async () => {
         const p = new CauriProvider(CONFIG)
         await expect(
-            p.request({ method: 'prepareExecuteAndWait' as never }),
+            p.request({ method: 'nonexistentMethod' as never }),
         ).rejects.toThrow(/not implemented/)
     })
 
@@ -109,6 +109,33 @@ describe('CauriProvider — dispatch', () => {
                 params: { commands: [] as never },
             }),
         ).rejects.toThrow(/Not connected/)
+    })
+
+    it('prepareExecuteAndWait throws Not connected when no session', async () => {
+        const p = new CauriProvider(CONFIG)
+        await expect(
+            p.request({
+                method: 'prepareExecuteAndWait',
+                params: { commands: [] as never },
+            }),
+        ).rejects.toThrow(/Not connected/)
+    })
+
+    it('connect throws a typed CauriUserRejectedError when the popup is blocked', async () => {
+        const openSpy = vi.spyOn(window, 'open').mockReturnValue(null)
+        try {
+            const p = new CauriProvider(CONFIG)
+            await expect(p.request({ method: 'connect' })).rejects.toMatchObject({
+                name: 'CauriUserRejectedError',
+                reason: 'popup_blocked',
+                code: 4001,
+            })
+            await expect(p.request({ method: 'connect' })).rejects.toBeInstanceOf(
+                CauriUserRejectedError,
+            )
+        } finally {
+            openSpy.mockRestore()
+        }
     })
 
     it('ledgerApi throws Not connected when no session', async () => {

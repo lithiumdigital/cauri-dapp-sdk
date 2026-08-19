@@ -20,7 +20,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22.18.0'
+          node-version: '24.10.0'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
@@ -59,7 +59,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: '22.18.0'
+          node-version: '24.10.0'
           cache: 'npm'
           registry-url: 'https://registry.npmjs.org'
 
@@ -69,8 +69,8 @@ jobs:
       - name: Build
         run: npm run build
 
-      # npm Trusted Publishing needs npm >= 11.5.1. Node 22 ships with
-      # npm 10.x, so upgrade before publish.
+      # npm Trusted Publishing needs npm >= 11.5.1. Pin to the latest npm
+      # before publish so the version is explicit regardless of the bundled one.
       - name: Upgrade npm for Trusted Publishing
         run: npm install -g npm@latest
 
