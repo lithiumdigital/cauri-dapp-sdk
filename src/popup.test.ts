@@ -42,7 +42,7 @@ describe('waitForOpenerMessage', () => {
             timeoutMs: 1000,
         })
         postFakeMessage({ type: 'OK', ok: 1 }, WALLET_ORIGIN, popup)
-        await expect(promise).resolves.toEqual({ type: 'OK', ok: 1 })
+        await expect(promise).resolves.toEqual({ status: 'success', value: { type: 'OK', ok: 1 } })
     })
 
     it('ignores messages from the wrong origin (forgery guard)', async () => {
@@ -55,7 +55,7 @@ describe('waitForOpenerMessage', () => {
             timeoutMs: 100,
         })
         postFakeMessage({ type: 'OK' }, 'https://evil.example', popup)
-        await expect(promise).resolves.toBeUndefined()
+        await expect(promise).resolves.toEqual({ status: 'timeout' })
     })
 
     it('ignores messages from the wrong source window (forgery guard)', async () => {
@@ -69,10 +69,10 @@ describe('waitForOpenerMessage', () => {
             timeoutMs: 100,
         })
         postFakeMessage({ type: 'OK' }, WALLET_ORIGIN, otherWindow)
-        await expect(promise).resolves.toBeUndefined()
+        await expect(promise).resolves.toEqual({ status: 'timeout' })
     })
 
-    it('resolves undefined on a reject envelope', async () => {
+    it('resolves rejected on a reject envelope', async () => {
         const popup = makeFakePopup()
         const promise = waitForOpenerMessage({
             popup,
@@ -82,10 +82,10 @@ describe('waitForOpenerMessage', () => {
             timeoutMs: 1000,
         })
         postFakeMessage({ type: 'BAD' }, WALLET_ORIGIN, popup)
-        await expect(promise).resolves.toBeUndefined()
+        await expect(promise).resolves.toEqual({ status: 'rejected' })
     })
 
-    it('resolves undefined on timeout', async () => {
+    it('resolves timeout on expiry', async () => {
         const popup = makeFakePopup()
         const promise = waitForOpenerMessage({
             popup,
@@ -94,7 +94,7 @@ describe('waitForOpenerMessage', () => {
             matchReject: () => false,
             timeoutMs: 20,
         })
-        await expect(promise).resolves.toBeUndefined()
+        await expect(promise).resolves.toEqual({ status: 'timeout' })
     })
 
     it('rejects on abort', async () => {

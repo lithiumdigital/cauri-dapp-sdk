@@ -5,6 +5,8 @@ import type {
     SignMessageResult,
     SignMessageParams,
     PrepareExecuteParams,
+    PrepareExecuteAndWaitResult,
+    TxChangedExecutedEvent,
     LedgerApiParams,
     LedgerApiResult,
 } from '@canton-network/core-wallet-dapp-rpc-client'
@@ -14,9 +16,11 @@ import {
     navigatePopup,
     waitForOpenerMessage,
     normalizeOrigin,
+    type OpenerOutcome,
 } from './popup'
 import {
     CauriRpcClient,
+    CauriUserRejectedError,
     type CauriConnectResult,
     type CauriIsConnectedResult,
     type CauriSignMessageResult,
@@ -123,6 +127,10 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
                 return (await this.doPrepareExecute(
                     (args as RequestArgs<DappRpcTypes, 'prepareExecute'>).params,
                 )) as DappRpcTypes[M]['result']
+            case 'prepareExecuteAndWait':
+                return (await this.doPrepareExecuteAndWait(
+                    (args as RequestArgs<DappRpcTypes, 'prepareExecuteAndWait'>).params,
+                )) as DappRpcTypes[M]['result']
             case 'ledgerApi':
                 return (await this.doLedgerApi(
                     (args as RequestArgs<DappRpcTypes, 'ledgerApi'>).params,
@@ -138,9 +146,31 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
         return await this.rpc.call<T>(method, undefined, this.sessionToken)
     }
 
+    /** Return the approval value, or throw a typed error for reject/timeout/closed. */
+    private assertApproved<T>(outcome: OpenerOutcome<T>, action: string): T {
+        switch (outcome.status) {
+            case 'success':
+                return outcome.value
+            case 'rejected':
+                throw new CauriUserRejectedError('rejected', `User rejected ${action}`)
+            case 'timeout':
+                throw new CauriUserRejectedError('timeout', `${action} approval timed out`)
+            case 'closed':
+                throw new CauriUserRejectedError(
+                    'popup_closed',
+                    `Approval window closed before ${action} completed`,
+                )
+        }
+    }
+
     private async doConnect(): Promise<ConnectResult> {
         const popup = openPlaceholderPopup('cauriConnect')
-        if (!popup) throw new Error('Popup blocked. Allow popups for this site and try again.')
+        if (!popup) {
+            throw new CauriUserRejectedError(
+                'popup_blocked',
+                'Popup blocked. Allow popups for this site and try again.',
+            )
+        }
         this.activePopups.add(popup)
 
         try {
@@ -154,7 +184,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
                 `${this.walletUiBase}/dapp/connect/${encodeURIComponent(sessionId)}`,
             )
 
-            const approval = await waitForOpenerMessage<{ sessionId: string }>({
+            const outcome = await waitForOpenerMessage<{ sessionId: string }>({
                 popup,
                 walletOrigin: this.walletOrigin,
                 matchSuccess: (m) =>
@@ -165,7 +195,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
                     (m as { sessionId?: string }).sessionId === sessionId,
                 timeoutMs: APPROVAL_TIMEOUT_MS,
             })
-            if (!approval) throw new Error('User rejected connect')
+            this.assertApproved(outcome, 'connect')
 
             this.sessionId = sessionId
             this.sessionToken = result.sessionToken
@@ -221,7 +251,12 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
     private async doSignMessage(params: SignMessageParams): Promise<SignMessageResult> {
         if (!this.sessionToken) throw new Error('Not connected')
         const popup = openPlaceholderPopup('cauriSignMessage')
-        if (!popup) throw new Error('Popup blocked. Allow popups for this site and try again.')
+        if (!popup) {
+            throw new CauriUserRejectedError(
+                'popup_blocked',
+                'Popup blocked. Allow popups for this site and try again.',
+            )
+        }
         this.activePopups.add(popup)
 
         try {
@@ -239,7 +274,7 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
                 `${this.walletUiBase}/dapp/message/${encodeURIComponent(messageId)}`,
             )
 
-            const approval = await waitForOpenerMessage<{
+            const outcome = await waitForOpenerMessage<{
                 commandId: string
                 signature: string
                 keyFingerprint: string
@@ -254,45 +289,126 @@ export class CauriProvider extends AbstractProvider<DappRpcTypes> {
                     (m as { commandId?: string }).commandId === messageId,
                 timeoutMs: APPROVAL_TIMEOUT_MS,
             })
-            if (!approval) throw new Error('User rejected signMessage')
+            const approval = this.assertApproved(outcome, 'signMessage')
             return { signature: approval.signature }
         } finally {
             this.releasePopup(popup)
         }
     }
 
+    /** Prepare the transaction and point the popup at it; returns the command id. */
+    private async beginPrepareExecute(
+        params: PrepareExecuteParams,
+        popup: Window,
+    ): Promise<string> {
+        if (!this.sessionToken) throw new Error('Not connected')
+        const prep = await this.rpc.call<CauriPrepareExecuteResult>(
+            'prepareExecute',
+            params as unknown as Record<string, unknown>,
+            this.sessionToken,
+        )
+        if (!prep.userUrl) throw new Error('Cauri gateway prepareExecute returned no userUrl')
+        const commandId = lastPathSegment(prep.userUrl)
+        navigatePopup(
+            popup,
+            `${this.walletUiBase}/dapp/transaction/${encodeURIComponent(commandId)}`,
+        )
+        return commandId
+    }
+
+    /** Wait for the user to approve the transaction popup. */
+    private async awaitTxApproval(popup: Window, commandId: string): Promise<void> {
+        const outcome = await waitForOpenerMessage<{ commandId: string; transactionId: string }>({
+            popup,
+            walletOrigin: this.walletOrigin,
+            matchSuccess: (m) =>
+                m.type === MSG_TX_APPROVED &&
+                (m as { commandId?: string }).commandId === commandId,
+            matchReject: (m) =>
+                m.type === MSG_TX_REJECTED &&
+                (m as { commandId?: string }).commandId === commandId,
+            timeoutMs: APPROVAL_TIMEOUT_MS,
+        })
+        this.assertApproved(outcome, 'transaction')
+    }
+
+    /** Resolve with the executed event for a command, or reject when it fails. cancel() detaches the listener. */
+    private waitForTerminalTx(commandId: string): {
+        promise: Promise<TxChangedExecutedEvent>
+        cancel: () => void
+    } {
+        let listener!: (ev: unknown) => void
+        const cancel = () => this.removeListener('txChanged', listener)
+        const promise = new Promise<TxChangedExecutedEvent>((resolve, reject) => {
+            listener = (ev: unknown) => {
+                const e = ev as {
+                    commandId?: string
+                    status?: string
+                    payload?: { reason?: string }
+                }
+                if (e?.commandId !== commandId) return
+                if (e.status === 'executed') {
+                    cancel()
+                    resolve(ev as TxChangedExecutedEvent)
+                } else if (e.status === 'failed') {
+                    cancel()
+                    const reason = e.payload?.reason
+                    if (reason === 'user_rejected') {
+                        reject(new CauriUserRejectedError('rejected', 'User rejected transaction'))
+                    } else {
+                        reject(new Error(`Transaction failed${reason ? `: ${reason}` : ''}`))
+                    }
+                }
+            }
+            this.on('txChanged', listener)
+        })
+        return { promise, cancel }
+    }
+
     private async doPrepareExecute(params: PrepareExecuteParams): Promise<null> {
         if (!this.sessionToken) throw new Error('Not connected')
         const popup = openPlaceholderPopup('cauriTx')
-        if (!popup) throw new Error('Popup blocked. Allow popups for this site and try again.')
+        if (!popup) {
+            throw new CauriUserRejectedError(
+                'popup_blocked',
+                'Popup blocked. Allow popups for this site and try again.',
+            )
+        }
         this.activePopups.add(popup)
 
         try {
-            const prep = await this.rpc.call<CauriPrepareExecuteResult>(
-                'prepareExecute',
-                params as unknown as Record<string, unknown>,
-                this.sessionToken,
-            )
-            if (!prep.userUrl) throw new Error('Cauri gateway prepareExecute returned no userUrl')
-            const commandId = lastPathSegment(prep.userUrl)
-            navigatePopup(
-                popup,
-                `${this.walletUiBase}/dapp/transaction/${encodeURIComponent(commandId)}`,
-            )
-
-            const approval = await waitForOpenerMessage<{ commandId: string; transactionId: string }>({
-                popup,
-                walletOrigin: this.walletOrigin,
-                matchSuccess: (m) =>
-                    m.type === MSG_TX_APPROVED &&
-                    (m as { commandId?: string }).commandId === commandId,
-                matchReject: (m) =>
-                    m.type === MSG_TX_REJECTED &&
-                    (m as { commandId?: string }).commandId === commandId,
-                timeoutMs: APPROVAL_TIMEOUT_MS,
-            })
-            if (!approval) throw new Error('User rejected transaction')
+            const commandId = await this.beginPrepareExecute(params, popup)
+            await this.awaitTxApproval(popup, commandId)
             return null
+        } finally {
+            this.releasePopup(popup)
+        }
+    }
+
+    private async doPrepareExecuteAndWait(
+        params: PrepareExecuteParams,
+    ): Promise<PrepareExecuteAndWaitResult> {
+        if (!this.sessionToken) throw new Error('Not connected')
+        const popup = openPlaceholderPopup('cauriTx')
+        if (!popup) {
+            throw new CauriUserRejectedError(
+                'popup_blocked',
+                'Popup blocked. Allow popups for this site and try again.',
+            )
+        }
+        this.activePopups.add(popup)
+
+        try {
+            const commandId = await this.beginPrepareExecute(params, popup)
+            // Attach before awaiting approval so the terminal event can't be missed.
+            const { promise: executed, cancel } = this.waitForTerminalTx(commandId)
+            try {
+                await this.awaitTxApproval(popup, commandId)
+            } catch (err) {
+                cancel()
+                throw err
+            }
+            return { tx: await executed }
         } finally {
             this.releasePopup(popup)
         }

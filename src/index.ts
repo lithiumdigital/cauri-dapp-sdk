@@ -1,4 +1,5 @@
 export { createCauriAdapter } from './adapter'
 export { cauriAdapterFactory } from './factory'
-export { CauriRpcError } from './rpc'
+export { CauriRpcError, CauriUserRejectedError } from './rpc'
+export type { CauriUserRejectedReason } from './rpc'
 export type { CauriAdapterConfig, CauriSessionRecord } from './types'

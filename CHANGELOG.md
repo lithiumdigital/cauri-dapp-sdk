@@ -8,15 +8,20 @@ and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.
 
 _No changes yet._
 
-## 0.1.1 — 2026-08-03
+## 0.2.0 — 2026-08-19
 
-Documentation improvements. No API or runtime changes.
+Additive changes; existing usage is unaffected.
 
-- README expanded with clearer usage examples for both entry points
-  (`createCauriAdapter` for explicit URLs, `cauriAdapterFactory` for
-  wallet-discovery frameworks).
-- Documented the full list of supported CIP-103 methods.
-- Documented the SSE event names forwarded on the adapter.
+- Add `prepareExecuteAndWait`, which resolves with the executed transaction
+  rather than returning once the user approves.
+- Forward the `connected` event on the adapter's `on()` surface.
+- Throw `CauriUserRejectedError` when an approval does not complete, in place
+  of a generic error. Its `reason` is `'rejected'`, `'timeout'`,
+  `'popup_closed'`, or `'popup_blocked'`. Now exported alongside
+  `CauriUserRejectedReason`.
+- README: network endpoint table (devnet, mainnet), a results-and-errors
+  section, expanded usage examples for both entry points, and the full list
+  of supported CIP-103 methods and forwarded events.
 
 ## 0.1.0 — 2026-08-03
 

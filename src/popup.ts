@@ -80,27 +80,29 @@ export interface WaitForMessageOptions<T> {
     matchSuccess: (m: { type: string }) => boolean
     /** Predicate that matches a rejection envelope. */
     matchReject: (m: { type: string }) => boolean
-    /** Timeout in ms; resolves undefined on expiry. */
+    /** Timeout in ms; resolves { status: 'timeout' } on expiry. */
     timeoutMs: number
     /** Optional abort signal; rejects with an Error when fired. */
     abortSignal?: AbortSignal
 }
 
+/** Outcome of a popup approval wait. */
+export type OpenerOutcome<T> =
+    | { status: 'success'; value: T }
+    | { status: 'rejected' }
+    | { status: 'timeout' }
+    | { status: 'closed' }
+
 /**
- * Resolve when the popup posts a message matching matchSuccess; resolve
- * undefined on a matchReject message or on timeout; reject on abort.
- *
- * Enforces:
- *  - ev.origin === walletOrigin
- *  - ev.source === popup
- *
- * Messages from any other origin or window are silently dropped.
+ * Resolve success/rejected/timeout/closed by how the approval popup ended;
+ * reject only on abort. Enforces ev.origin === walletOrigin and
+ * ev.source === popup; other messages are dropped.
  */
 export function waitForOpenerMessage<T>(
     opts: WaitForMessageOptions<T>,
-): Promise<T | undefined> {
+): Promise<OpenerOutcome<T>> {
     const { popup, walletOrigin, matchSuccess, matchReject, timeoutMs, abortSignal } = opts
-    return new Promise<T | undefined>((resolve, reject) => {
+    return new Promise<OpenerOutcome<T>>((resolve, reject) => {
         const cleanup = () => {
             window.removeEventListener('message', onMsg)
             clearTimeout(timer)
@@ -115,10 +117,10 @@ export function waitForOpenerMessage<T>(
             const typed = m as { type: string }
             if (matchSuccess(typed)) {
                 cleanup()
-                resolve(m as T)
+                resolve({ status: 'success', value: m as T })
             } else if (matchReject(typed)) {
                 cleanup()
-                resolve(undefined)
+                resolve({ status: 'rejected' })
             }
         }
         const onAbort = () => {
@@ -127,12 +129,12 @@ export function waitForOpenerMessage<T>(
         }
         const timer = setTimeout(() => {
             cleanup()
-            resolve(undefined)
+            resolve({ status: 'timeout' })
         }, timeoutMs)
         const closedPoll = setInterval(() => {
             if (popup.closed) {
                 cleanup()
-                resolve(undefined)
+                resolve({ status: 'closed' })
             }
         }, 500)
         window.addEventListener('message', onMsg)

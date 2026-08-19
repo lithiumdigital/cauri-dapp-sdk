@@ -23,6 +23,16 @@ npm install \
   @canton-network/core-wallet-discovery
 ```
 
+## Network endpoints
+
+| Network        | Wallet UI (`walletUiBase`) | dApp API (`apiBase`)         |
+| -------------- | -------------------------- | ---------------------------- |
+| Devnet (test)  | https://devnet.cauri.cc    | https://api.devnet.cauri.cc  |
+| Mainnet        | https://cauri.cc           | https://api.mainnet.cauri.cc |
+
+With `createCauriAdapter`, pass the pair for the network you target.
+`cauriAdapterFactory` resolves these from the discovery registry host.
+
 ## Usage
 
 ### `createCauriAdapter` — explicit URLs
@@ -40,7 +50,7 @@ const cauri = createCauriAdapter({
 })
 
 const provider = cauri.provider()
-await provider.request({ method: 'connect', params: { ... } })
+await provider.request({ method: 'connect' })
 ```
 
 The returned adapter conforms to the
@@ -67,13 +77,45 @@ const factories = [cauriAdapterFactory, /* ... */]
 
 `connect`, `disconnect`, `isConnected`, `status`, `getActiveNetwork`,
 `listAccounts`, `getPrimaryAccount`, `signMessage`, `prepareExecute`,
-`ledgerApi`.
+`prepareExecuteAndWait`, `ledgerApi`.
 
-## SSE events
+## Events
 
 The adapter forwards Cauri wallet events over the standard
-`ProviderAdapter` `on()` surface: `txChanged`, `statusChanged`,
-`accountsChanged`, `messageSignature`.
+`ProviderAdapter` `on()` surface: `connected`, `txChanged`,
+`statusChanged`, `accountsChanged`, `messageSignature`.
+
+## Results and errors
+
+`prepareExecute` resolves once the user approves; the transaction outcome
+then arrives as a `txChanged` event. To resolve directly with the executed
+transaction instead, use `prepareExecuteAndWait`:
+
+```ts
+const { tx } = await provider.request({
+    method: 'prepareExecuteAndWait',
+    params: { commands: [ /* ... */ ] },
+})
+```
+
+Two error types are thrown:
+
+- `CauriRpcError` — the gateway returned a JSON-RPC error. `.error` carries
+  `{ code, message, data }`.
+- `CauriUserRejectedError` — an approval did not complete. `.reason` is one of
+  `'rejected'`, `'timeout'`, `'popup_closed'`, `'popup_blocked'`.
+
+```ts
+import { CauriUserRejectedError } from '@lithiumdigital/cauri-dapp-sdk'
+
+try {
+    await provider.request({ method: 'connect' })
+} catch (err) {
+    if (err instanceof CauriUserRejectedError && err.reason === 'popup_blocked') {
+        // ask the user to allow popups, then retry
+    }
+}
+```
 
 ## Security
 
@@ -101,9 +143,10 @@ npm run typecheck
 
 Semantic versioning. The **public API** is everything exported from
 `src/index.ts` (`createCauriAdapter`, `cauriAdapterFactory`,
-`CauriRpcError`, `CauriAdapterConfig`, `CauriSessionRecord`) and the
-runtime behaviour of those exports (RPC method surface, event names,
-storage key). Anything else is internal and may change in any release.
+`CauriRpcError`, `CauriUserRejectedError`, `CauriAdapterConfig`,
+`CauriSessionRecord`) and the runtime behaviour of those exports (RPC
+method surface, event names, storage key). Anything else is internal and
+may change in any release.
 
 - **Major** — breaking change to any of the above (renamed export,
   removed method, changed event name, changed storage key/shape).

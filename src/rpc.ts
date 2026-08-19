@@ -36,6 +36,23 @@ export class CauriRpcError extends Error {
     }
 }
 
+/** Why a user-approval interaction did not complete. */
+export type CauriUserRejectedReason = 'rejected' | 'timeout' | 'popup_closed' | 'popup_blocked'
+
+/** Code for "the user did not approve", following the wallet convention. */
+export const USER_REJECTED_CODE = 4001
+
+/** Thrown when connect, signMessage, or prepareExecute is not approved. `reason` distinguishes the cases. */
+export class CauriUserRejectedError extends Error {
+    readonly reason: CauriUserRejectedReason
+    readonly code = USER_REJECTED_CODE
+    constructor(reason: CauriUserRejectedReason, message: string) {
+        super(message)
+        this.name = 'CauriUserRejectedError'
+        this.reason = reason
+    }
+}
+
 export interface CauriConnectResult {
     isConnected: boolean
     isNetworkConnected: boolean
