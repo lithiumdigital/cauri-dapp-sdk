@@ -69,10 +69,11 @@ jobs:
       - name: Build
         run: npm run build
 
-      # npm Trusted Publishing needs npm >= 11.5.1. Pin to the latest npm
-      # before publish so the version is explicit regardless of the bundled one.
+      # npm Trusted Publishing needs npm >= 11.5.1. Pin to the 11.x line so the
+      # version is explicit yet stays compatible with the node version above
+      # (npm@latest is now 12.x, which requires a newer node).
       - name: Upgrade npm for Trusted Publishing
-        run: npm install -g npm@latest
+        run: npm install -g npm@11
 
       - name: Publish to npm (Trusted Publishing)
         run: npm publish --access public --provenance
